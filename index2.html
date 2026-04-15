@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>記帳工具 Light</title>
+  <link rel="stylesheet" href="./styles2.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer onload="onGisLoaded()"></script>
+</head>
+
+<body>
+
+  <!-- ── Toast region (aria-live for screen readers) ── -->
+  <div id="toastRegion" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ── Top bar ── -->
+  <header class="topbar" role="banner">
+    <div class="topbar-inner">
+      <div class="brand" aria-label="記帳工具">
+        <span class="brand-icon" aria-hidden="true">💰</span>
+        <span class="brand-name">記帳工具</span>
+        <span class="brand-pill">Google Sheets</span>
+      </div>
+      <div class="auth-area">
+        <span id="authHint" class="auth-hint" aria-live="polite">尚未登入</span>
+        <button id="btnSignIn" class="btn btn-primary" disabled
+                aria-label="使用 Google 帳號登入">
+          <span class="btn-label">登入 Google</span>
+          <span class="spinner" aria-hidden="true"></span>
+        </button>
+        <button id="btnSignOut" class="btn btn-outline" disabled
+                aria-label="登出 Google 帳號">登出</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Page layout ── -->
+  <div class="page">
+
+    <!-- ════ SIDEBAR ════ -->
+    <aside class="sidebar" aria-label="統計側欄">
+
+      <!-- Month picker -->
+      <div class="widget">
+        <div class="widget-title">查看月份</div>
+        <label for="monthPicker" class="sr-only">選擇月份</label>
+        <input id="monthPicker" class="input-month" type="month"
+               disabled aria-label="選擇月份" />
+      </div>
+
+      <!-- KPI -->
+      <div class="widget" aria-label="本月概覽">
+        <div class="widget-title">本月概覽</div>
+        <div class="kpi-grid" role="list">
+
+          <div class="kpi kpi-income" role="listitem">
+            <div class="kpi-info">
+              <span class="kpi-label">收入</span>
+              <span id="deltaIncome" class="kpi-delta" aria-live="polite"></span>
+            </div>
+            <span id="sumIncome" class="kpi-value num" aria-label="本月收入">0</span>
+          </div>
+
+          <div class="kpi kpi-expense" role="listitem">
+            <div class="kpi-info">
+              <span class="kpi-label">支出</span>
+              <span id="deltaExpense" class="kpi-delta" aria-live="polite"></span>
+            </div>
+            <span id="sumExpense" class="kpi-value num" aria-label="本月支出">0</span>
+          </div>
+
+          <div class="kpi kpi-net" role="listitem">
+            <div class="kpi-info">
+              <span class="kpi-label">結餘</span>
+              <span id="deltaNet" class="kpi-delta" aria-live="polite"></span>
+            </div>
+            <span id="sumNet" class="kpi-value num" aria-label="本月結餘">0</span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Category breakdown -->
+      <div class="widget" aria-label="支出分類統計">
+        <div class="widget-title">支出分類</div>
+        <div id="categoryBreakdown" class="breakdown" role="list">
+          <div class="breakdown-empty">本月尚無支出</div>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ════ MAIN ════ -->
+    <main class="content" id="main-content">
+
+      <!-- ── Add record card ── -->
+      <section class="card" aria-labelledby="formTitle">
+        <div class="card-header">
+          <h2 id="formTitle" class="card-title">新增記帳</h2>
+          <button id="btnReload" class="btn btn-outline btn-sm" disabled
+                  aria-label="重新讀取本月資料">重新讀取</button>
+        </div>
+
+        <form id="recordForm" novalidate aria-label="記帳新增表單">
+          <div class="form-grid">
+
+            <div class="field">
+              <label class="label" for="fDate">
+                日期 <span class="req" aria-hidden="true">*</span>
+              </label>
+              <input id="fDate" class="input" type="date"
+                     required autocomplete="off" aria-required="true" />
+              <span class="field-error" id="errDate" role="alert"></span>
+            </div>
+
+            <div class="field">
+              <label class="label" for="fType">
+                類型 <span class="req" aria-hidden="true">*</span>
+              </label>
+              <select id="fType" class="input" required aria-required="true">
+                <option value="支出">支出</option>
+                <option value="收入">收入</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label class="label" for="fCategory">
+                分類 <span class="req" aria-hidden="true">*</span>
+              </label>
+              <select id="fCategory" class="input" required aria-required="true"></select>
+            </div>
+
+            <div class="field">
+              <label class="label" for="fPayment">
+                付款方式 <span class="req" aria-hidden="true">*</span>
+              </label>
+              <select id="fPayment" class="input" required aria-required="true"></select>
+            </div>
+
+            <div class="field">
+              <label class="label" for="fAmount">
+                金額 <span class="req" aria-hidden="true">*</span>
+              </label>
+              <input id="fAmount" class="input" type="number"
+                     min="0" step="1" inputmode="numeric"
+                     placeholder="0"
+                     required aria-required="true"
+                     autocomplete="off" />
+              <span class="field-error" id="errAmount" role="alert"></span>
+            </div>
+
+            <div class="field">
+              <label class="label" for="fDescription">
+                說明 <span class="req" aria-hidden="true">*</span>
+              </label>
+              <input id="fDescription" class="input" type="text"
+                     placeholder="例：早餐、房租、薪資"
+                     required aria-required="true"
+                     autocomplete="off" />
+              <span class="field-error" id="errDesc" role="alert"></span>
+            </div>
+
+          </div>
+
+          <div class="form-footer">
+            <button id="btnSubmit" class="btn btn-primary" type="submit" disabled>
+              <span class="btn-label">新增記帳</span>
+              <span class="spinner" aria-hidden="true"></span>
+            </button>
+            <!-- Inline status (also fed to aria-live toast) -->
+            <p id="statusMsg" class="status-bar" aria-live="polite"></p>
+          </div>
+        </form>
+      </section>
+
+      <!-- ── Month trend chart ── -->
+      <section class="card" aria-labelledby="trendTitle">
+        <div class="card-header">
+          <h2 id="trendTitle" class="card-title">月份收支比較</h2>
+          <span class="card-subtitle">近 6 個月</span>
+        </div>
+        <div id="trendChart" class="trend-chart">
+          <div class="trend-empty">登入後顯示</div>
+        </div>
+      </section>
+
+      <!-- ── Records table ── -->
+      <section class="card" aria-labelledby="tableTitle">
+        <div class="card-header">
+          <h2 id="tableTitle" class="card-title">本月明細</h2>
+          <button id="btnRefresh" class="btn btn-outline btn-sm" disabled
+                  aria-label="刷新明細資料">刷新</button>
+        </div>
+
+        <div class="table-wrap" role="region" aria-label="記帳明細表格" tabindex="0">
+          <table class="table" aria-describedby="tableTitle">
+            <thead>
+              <tr>
+                <th scope="col">日期</th>
+                <th scope="col">類型</th>
+                <th scope="col">分類</th>
+                <th scope="col" class="right">金額</th>
+                <th scope="col">說明</th>
+                <th scope="col">付款方式</th>
+                <th scope="col" class="td-action">操作</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTbody">
+              <!-- Rows injected by JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <footer class="footer" role="contentinfo">
+    <small>Tips：欄位表若未填 Type，會被視為支出/收入共用選項。</small>
+  </footer>
+
+  <script src="./app2.js"></script>
+</body>
+</html>
